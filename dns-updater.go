@@ -4,21 +4,18 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/digitalocean/godo"
 	"golang.org/x/oauth2"
 )
 
-const (
-	domain    = "ryannixon.com"
-	subdomain = "home"
-	dnsID     = 86651009
-)
-
 // Updater can be used to update DNS records
 type Updater interface {
-	GetCurrent(ctx context.Context) (string, error)
-	Update(ctx context.Context, ip string) error
+	GetCurrent(ctx context.Context, domain string) (string, error)
+	Update(ctx context.Context, domain string, ip string) error
+	ListAllRecords(ctx context.Context, domain string) error
+	GetRecord(ctx context.Context, domain string) (*godo.DomainRecord, error)
 }
 
 // DigitalOceanUpdater can be used to update DigitalOcean DNS records
@@ -46,8 +43,8 @@ func NewDigitalOceanUpdater() Updater {
 }
 
 // GetCurrent retrieves the current IP address for the home record
-func (d *DigitalOceanUpdater) GetCurrent(ctx context.Context) (string, error) {
-	record, _, err := d.client.Domains.Record(ctx, domain, dnsID)
+func (d *DigitalOceanUpdater) GetCurrent(ctx context.Context, domain string) (string, error) {
+	record, err := d.GetRecord(ctx, domain)
 	if err != nil {
 		return "", err
 	}
@@ -56,25 +53,58 @@ func (d *DigitalOceanUpdater) GetCurrent(ctx context.Context) (string, error) {
 }
 
 // Update updates the IP address for the home record
-func (d *DigitalOceanUpdater) Update(ctx context.Context, ip string) error {
-	_, _, err := d.client.Domains.EditRecord(ctx, domain, dnsID, &godo.DomainRecordEditRequest{
+func (d *DigitalOceanUpdater) Update(ctx context.Context, domain string, ip string) error {
+	apex, sub := extractDomain(domain)
+	record, err := d.GetRecord(ctx, apex)
+	if err != nil {
+		return err
+	}
+
+	_, _, err = d.client.Domains.EditRecord(ctx, apex, record.ID, &godo.DomainRecordEditRequest{
 		Type: "A",
-		Name: subdomain,
+		Name: sub,
 		Data: ip,
 	})
 
 	return err
 }
 
-// ListAllRecords will list all records for the domain
+// GetRecord will list all records for the domain
 // This can be used to find the "id" value for a given DNS record
-func (d *DigitalOceanUpdater) ListAllRecords(ctx context.Context, client *godo.Client) error {
+func (d *DigitalOceanUpdater) GetRecord(ctx context.Context, domain string) (*godo.DomainRecord, error) {
 	opt := &godo.ListOptions{
 		Page:    1,
 		PerPage: 100,
 	}
 
-	records, _, err := client.Domains.Records(ctx, domain, opt)
+	apex, sub := extractDomain(domain)
+	records, _, err := d.client.Domains.Records(ctx, apex, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, record := range records {
+		if record.Type != "A" {
+			// Only A records will contain IP addresses
+			continue
+		} else if record.Name == "@" && domain == apex || record.Name == sub {
+			return &record, nil
+		}
+	}
+
+	return nil, fmt.Errorf("Record not found in DigitalOcean")
+}
+
+// ListAllRecords will list all records for the domain
+// This can be used to find the "id" value for a given DNS record
+func (d *DigitalOceanUpdater) ListAllRecords(ctx context.Context, domain string) error {
+	opt := &godo.ListOptions{
+		Page:    1,
+		PerPage: 100,
+	}
+
+	apex, _ := extractDomain(domain)
+	records, _, err := d.client.Domains.Records(ctx, apex, opt)
 	if err != nil {
 		return err
 	}
@@ -84,6 +114,13 @@ func (d *DigitalOceanUpdater) ListAllRecords(ctx context.Context, client *godo.C
 	}
 
 	return nil
+}
+
+func extractDomain(domain string) (apex string, sub string) {
+	split := strings.Split(domain, ".")
+	apex = strings.Join(split[len(split)-2:], ".")
+	sub = strings.Join(split[0:len(split)-2], ".")
+	return
 }
 
 // Token returns an OAuth2 token formatted with the TokenSource's access token
