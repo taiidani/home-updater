@@ -10,7 +10,6 @@ import (
 var domains = []string{
 	"home.ryannixon.com",
 	"taiidani.com",
-	"home.taiidani.com",
 	"momentumdance.org",
 }
 
