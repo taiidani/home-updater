@@ -1,0 +1,8 @@
+version: "3.8"
+
+services:
+  app:
+    image: taiidani/home-updater:latest
+    build: .
+    environment:
+      DIGITALOCEAN_TOKEN:
