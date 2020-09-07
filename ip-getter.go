@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 )
+
+const canihaz = "https://icanhazip.com/s"
 
 // Getter gets a string from a remote location
 type Getter interface {
@@ -19,15 +22,15 @@ type IPGetter struct {
 
 // Get will use canihazip to retrieve teh current external IP address
 func (i *IPGetter) Get(ctx context.Context) (string, error) {
-	r, err := http.Get("https://www.canihazip.com/s")
+	r, err := http.Get(canihaz)
 	if err != nil {
-		return "", fmt.Errorf("Couldn't retrieve external IP address")
+		return "", fmt.Errorf("Couldn't retrieve external IP address: %w", err)
 	}
 
 	ip, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		return "", fmt.Errorf("Could not read IP address from response")
+		return "", fmt.Errorf("Could not read IP address from response: %w", err)
 	}
 
-	return fmt.Sprintf("%s", ip), nil
+	return strings.TrimSpace(fmt.Sprintf("%s", ip)), nil
 }
