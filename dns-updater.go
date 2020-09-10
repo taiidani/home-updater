@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -54,8 +55,9 @@ func (d *DigitalOceanUpdater) GetCurrent(ctx context.Context, domain string) (st
 
 // Update updates the IP address for the home record
 func (d *DigitalOceanUpdater) Update(ctx context.Context, domain string, ip string) error {
+	log.Println("Updating A record for " + domain)
 	apex, sub := extractDomain(domain)
-	record, err := d.GetRecord(ctx, apex)
+	record, err := d.GetRecord(ctx, domain)
 	if err != nil {
 		return err
 	}
@@ -80,14 +82,15 @@ func (d *DigitalOceanUpdater) GetRecord(ctx context.Context, domain string) (*go
 	apex, sub := extractDomain(domain)
 	records, _, err := d.client.Domains.Records(ctx, apex, opt)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Could not extract domain records: %w", err)
 	}
 
 	for _, record := range records {
+		log.Println("Found comparison record " + record.Type + " " + record.Name + " while searching for " + domain)
 		if record.Type != "A" {
 			// Only A records will contain IP addresses
 			continue
-		} else if record.Name == "@" && domain == apex || record.Name == sub {
+		} else if (record.Name == "@" && domain == apex) || record.Name == sub {
 			return &record, nil
 		}
 	}
