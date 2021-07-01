@@ -3,6 +3,6 @@ module home-updater
 go 1.13
 
 require (
-	github.com/digitalocean/godo v1.61.0
+	github.com/digitalocean/godo v1.62.0
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 )
