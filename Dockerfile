@@ -12,7 +12,7 @@ RUN go build -o main
 RUN go test ./...
 
 # ---
-FROM alpine:3.13.5 AS dist
+FROM alpine:3.14.0 AS dist
 
 # Dependencies
 RUN apk add --no-cache ca-certificates
